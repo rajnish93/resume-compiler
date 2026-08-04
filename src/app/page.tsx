@@ -22,7 +22,6 @@ export default function ResumeBuilder() {
   const [theme, setTheme] = useState<string>("modern");
   const [scale, setScale] = useState<number>(0.92);
   const [autoScale, setAutoScale] = useState<boolean>(true);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
   const margin = "0.4in";
   const paperFormat = "a4";
   const [activeTab, setActiveTab] = useState<"editor" | "css">("editor");
@@ -51,26 +50,30 @@ export default function ResumeBuilder() {
 
   // Initialize state on mount: check localStorage or fetch data/resume.md from /api/template
   useEffect(() => {
-    const savedMarkdown = localStorage.getItem("resume_markdown");
-    if (savedMarkdown) {
-      setMarkdown(savedMarkdown);
-    } else {
-      fetch("/api/template")
-        .then((res) => {
-          if (res.ok) return res.json();
-          throw new Error("Failed to fetch template");
-        })
-        .then((data) => {
-          if (data.markdown) setMarkdown(data.markdown);
-        })
-        .catch((err) => console.error("Failed to load template from data/resume.md:", err));
-    }
+    const loadInitialData = async () => {
+      const savedMarkdown = localStorage.getItem("resume_markdown");
+      if (savedMarkdown) {
+        setMarkdown(savedMarkdown);
+      } else {
+        try {
+          const res = await fetch("/api/template");
+          if (res.ok) {
+            const data = await res.json();
+            if (data.markdown) setMarkdown(data.markdown);
+          }
+        } catch (err) {
+          console.error("Failed to load template from data/resume.md:", err);
+        }
+      }
 
-    setCustomCss(localStorage.getItem("resume_custom_css") || "");
-    setTheme(localStorage.getItem("resume_theme") || "modern");
-    setScale(Number(localStorage.getItem("resume_scale")) || 0.92);
-    setAutoScale(localStorage.getItem("resume_autoscale") !== "false");
-    setMounted(true);
+      setCustomCss(localStorage.getItem("resume_custom_css") || "");
+      setTheme(localStorage.getItem("resume_theme") || "modern");
+      setScale(Number(localStorage.getItem("resume_scale")) || 0.92);
+      setAutoScale(localStorage.getItem("resume_autoscale") !== "false");
+      setMounted(true);
+    };
+
+    loadInitialData();
   }, []);
 
   // Persist session edits to localStorage
@@ -314,7 +317,6 @@ export default function ResumeBuilder() {
         <div className="logo">
           <div className="logo-icon">R</div>
           <h1>Resume Compiler</h1>
-          <span>Next.js App</span>
         </div>
         <div className="header-actions">
           <button onClick={handleReset} className="toolbar-btn" title="Reset to Sample">
