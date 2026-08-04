@@ -13,7 +13,7 @@ import {
   Maximize2,
   X
 } from "lucide-react";
-import { parseMarkdown } from "@/lib/parser";
+import { parseMarkdown, sanitizeCss } from "@/lib/parser";
 import { THEMES } from "@/lib/themes";
 
 export default function ResumeBuilder() {
@@ -154,7 +154,8 @@ export default function ResumeBuilder() {
 
   // Pre-render content
   const htmlContent = parseMarkdown(markdown);
-  const activeThemeCss = customCss ? customCss : THEMES[theme]?.css || THEMES["modern"].css;
+  const rawThemeCss = customCss ? customCss : THEMES[theme]?.css || THEMES["modern"].css;
+  const activeThemeCss = sanitizeCss(rawThemeCss);
 
   // In-place iframe synchronization effect (zero flicker, no document re-creation)
   useEffect(() => {
@@ -243,6 +244,7 @@ export default function ResumeBuilder() {
     // Apply scaling in-place to body
     const bodyEl = doc.body;
     if (bodyEl) {
+      // eslint-disable-next-line react-hooks/immutability
       bodyEl.style.zoom = scale.toString();
     }
 
