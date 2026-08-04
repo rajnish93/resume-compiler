@@ -27,7 +27,11 @@ export default function ResumeBuilder() {
   const [activeTab, setActiveTab] = useState<"editor" | "css">("editor");
   const [zoom, setZoom] = useState<number>(0.75);
   const [mounted, setMounted] = useState<boolean>(false);
-  const [paperHeight, setPaperHeight] = useState<number>(1123);
+  const [pageCount, setPageCount] = useState<number>(1);
+
+  const pageHeight = paperFormat === "a4" ? 1123 : 1056;
+  const pageWidth = paperFormat === "a4" ? 794 : 816;
+  const documentHeight = pageCount * pageHeight;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -138,7 +142,7 @@ export default function ResumeBuilder() {
                 margin: 0 !important;
                 padding: 0 !important;
                 box-sizing: border-box !important;
-                background-color: #ffffff;
+                background-color: transparent;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
                 width: 100% !important;
@@ -200,38 +204,55 @@ export default function ResumeBuilder() {
       bodyEl.style.zoom = scale.toString();
     }
 
-    // Perform height measurement & auto-scaling
+    // Perform height measurement & auto-scaling & pagination calculation
     const runMeasurement = () => {
-      if (containerEl) {
-        // Temporarily reset zoom to measure unscaled natural height
-        if (bodyEl) bodyEl.style.zoom = "1";
-        const contentHeight = containerEl.scrollHeight;
+      if (!containerEl || !doc.body) return;
 
-        const totalHeight = paperFormat === "a4" ? 1123 : 1056;
-        if (contentHeight > 0) {
-          const calculatedScale = totalHeight / contentHeight;
-          const finalScale = Math.min(1.0, Math.max(0.4, Number(calculatedScale.toFixed(2))));
+      // Temporarily set zoom to 1 to measure unscaled natural content height
+      doc.body.style.zoom = "1";
+      const naturalHeight = containerEl.scrollHeight;
+      if (naturalHeight <= 0) return;
 
-          if (autoScale) {
-            if (scale !== finalScale) {
-              setScale(finalScale);
-            }
-            if (bodyEl) bodyEl.style.zoom = finalScale.toString();
+      const MIN_SCALE = .88;
+      let appliedScale = scale;
+      let requiredPageCount = 1;
+
+      if (autoScale) {
+        if (naturalHeight <= pageHeight) {
+          appliedScale = 1.0;
+          requiredPageCount = 1;
+        } else {
+          const rawFitScale = pageHeight / naturalHeight;
+          if (rawFitScale >= MIN_SCALE) {
+            appliedScale = Number(rawFitScale.toFixed(2));
+            requiredPageCount = 1;
           } else {
-            if (bodyEl) bodyEl.style.zoom = scale.toString();
+            appliedScale = MIN_SCALE;
+            const scaledHeight = naturalHeight * appliedScale;
+            requiredPageCount = Math.max(1, Math.ceil(scaledHeight / pageHeight));
           }
-
-          const activeScale = autoScale ? finalScale : scale;
-          const visualContentHeight = Math.ceil(contentHeight * activeScale);
-          const newPaperHeight = Math.max(totalHeight, visualContentHeight);
-          setPaperHeight(newPaperHeight);
         }
+      } else {
+        appliedScale = Math.max(MIN_SCALE, scale);
+        const scaledHeight = naturalHeight * appliedScale;
+        requiredPageCount = Math.max(1, Math.ceil(scaledHeight / pageHeight));
+      }
+
+      // Apply zoom to iframe body
+      doc.body.style.zoom = appliedScale.toString();
+
+      // Update state only if values have actually changed to avoid infinite re-renders
+      if (autoScale && Math.abs(scale - appliedScale) >= 0.005) {
+        setScale(appliedScale);
+      }
+      if (pageCount !== requiredPageCount) {
+        setPageCount(requiredPageCount);
       }
     };
 
     const timeoutId = setTimeout(runMeasurement, 50);
     return () => clearTimeout(timeoutId);
-  }, [htmlContent, activeThemeCss, mounted, autoScale, paperFormat, scale]);
+  }, [htmlContent, activeThemeCss, mounted, autoScale, paperFormat, scale, pageCount, pageHeight]);
 
   // Vector Print / Save PDF Handler (Real selectable text, links, ATS-friendly)
   const handlePrint = () => {
@@ -272,6 +293,7 @@ export default function ResumeBuilder() {
       setTheme("modern");
       setScale(0.92);
       setAutoScale(true);
+      setPageCount(1);
     }
   };
 
@@ -401,7 +423,7 @@ export default function ResumeBuilder() {
           <div className="preview-header">
             <div className="preview-status">
               <span className="status-dot"></span>
-              <span>Live Preview Synced</span>
+              <span>Live Preview Synced ({pageCount} {pageCount === 1 ? "Page" : "Pages"})</span>
             </div>
             <div className="toolbar-group">
               <span className="setting-label" style={{ fontSize: "8.5pt" }}>Workspace Zoom:</span>
@@ -434,24 +456,84 @@ export default function ResumeBuilder() {
             <div
               className="paper-wrapper"
               style={{
-                width: (paperFormat === "a4" ? 794 : 816) * zoom,
-                height: paperHeight * zoom,
+                width: pageWidth * zoom,
+                height: documentHeight * zoom,
               }}
             >
               <div
                 className={`paper-frame format-${paperFormat}`}
                 style={{
-                  width: paperFormat === "a4" ? 794 : 816,
-                  height: paperHeight,
+                  width: pageWidth,
+                  height: documentHeight,
                   transform: `scale(${zoom})`,
                   transformOrigin: "top left",
+                  position: "relative",
+                  background: "transparent",
+                  boxShadow: "none",
+                  border: "none",
                 }}
               >
+                {/* Render pageCount A4 page backgrounds */}
+                <div
+                  className="page-backgrounds-container"
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "100%",
+                    pointerEvents: "none",
+                  }}
+                >
+                  {Array.from({ length: pageCount }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="page-sheet"
+                      style={{
+                        width: pageWidth,
+                        height: pageHeight,
+                        position: "absolute",
+                        top: index * pageHeight,
+                        left: 0,
+                        backgroundColor: "#ffffff",
+                        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.2)",
+                        borderBottom: index < pageCount - 1 ? "2px dashed #94a3b8" : "none",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      {pageCount > 1 && (
+                        <div
+                          className="page-number-badge"
+                          style={{
+                            position: "absolute",
+                            bottom: 12,
+                            right: 16,
+                            fontSize: "8pt",
+                            fontWeight: 600,
+                            color: "#94a3b8",
+                            userSelect: "none",
+                          }}
+                        >
+                          Page {index + 1} of {pageCount}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
                 <iframe
                   id="preview-iframe"
                   ref={iframeRef}
                   title="Resume Print Preview"
                   className="resume-iframe"
+                  style={{
+                    position: "relative",
+                    zIndex: 1,
+                    width: "100%",
+                    height: "100%",
+                    border: "none",
+                    background: "transparent",
+                  }}
                 />
               </div>
             </div>
@@ -504,7 +586,7 @@ export default function ResumeBuilder() {
               <input
                 id="scale-slider"
                 type="range"
-                min="0.4"
+                min=".88"
                 max="1.5"
                 step="0.01"
                 value={scale}
@@ -514,7 +596,9 @@ export default function ResumeBuilder() {
                 style={{ opacity: autoScale ? 0.5 : 1, cursor: autoScale ? "not-allowed" : "pointer" }}
               />
               <span style={{ fontSize: "7.5pt", color: "var(--text-muted)", marginTop: 2 }}>
-                {autoScale ? "Scale is managed automatically to fit A4 size." : "Shrink or enlarge text manually."}
+                {autoScale
+                  ? `Auto-fitting content (min scale 88%, ${pageCount} ${pageCount === 1 ? "page" : "pages"}).`
+                  : "Shrink or enlarge text manually."}
               </span>
             </div>
           </div>
