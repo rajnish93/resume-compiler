@@ -9,12 +9,12 @@ import {
   Download,
   Upload,
   Info,
-  Code
+  Code,
+  Maximize2,
+  X
 } from "lucide-react";
 import { parseMarkdown } from "@/lib/parser";
 import { THEMES } from "@/lib/themes";
-
-
 
 export default function ResumeBuilder() {
   const [markdown, setMarkdown] = useState<string>("");
@@ -28,6 +28,7 @@ export default function ResumeBuilder() {
   const [zoom, setZoom] = useState<number>(0.75);
   const [mounted, setMounted] = useState<boolean>(false);
   const [pageCount, setPageCount] = useState<number>(1);
+  const [showSettingsPopover, setShowSettingsPopover] = useState<boolean>(false);
 
   const pageHeight = paperFormat === "a4" ? 1123 : 1056;
   const pageWidth = paperFormat === "a4" ? 794 : 816;
@@ -37,6 +38,47 @@ export default function ResumeBuilder() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
   const previewViewportRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const popoverButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Close popover when clicking outside or pressing Escape key
+  useEffect(() => {
+    if (!showSettingsPopover) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        popoverRef.current &&
+        !popoverRef.current.contains(target) &&
+        popoverButtonRef.current &&
+        !popoverButtonRef.current.contains(target)
+      ) {
+        setShowSettingsPopover(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowSettingsPopover(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+
+    const iframeDoc = iframeRef.current?.contentDocument;
+    if (iframeDoc) {
+      iframeDoc.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+      if (iframeDoc) {
+        iframeDoc.removeEventListener("mousedown", handleClickOutside);
+      }
+    };
+  }, [showSettingsPopover]);
 
   // Dynamic zoom calculation to fit preview viewport perfectly
   const handleResetZoom = () => {
@@ -254,7 +296,7 @@ export default function ResumeBuilder() {
     return () => clearTimeout(timeoutId);
   }, [htmlContent, activeThemeCss, mounted, autoScale, paperFormat, scale, pageCount, pageHeight]);
 
-  // Vector Print / Save PDF Handler (Real selectable text, links, ATS-friendly)
+  // Vector Print / Save PDF Handler
   const handlePrint = () => {
     if (typeof window !== "undefined") {
       try {
@@ -329,7 +371,7 @@ export default function ResumeBuilder() {
   const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1).join("\n");
 
   if (!mounted) {
-    return <div style={{ background: "#0f172a", height: "100vh" }} />;
+    return <div style={{ background: "#090d16", height: "100vh" }} />;
   }
 
   return (
@@ -341,11 +383,23 @@ export default function ResumeBuilder() {
           <h1>Resume Compiler</h1>
         </div>
         <div className="header-actions">
-          <button onClick={handleReset} className="toolbar-btn" title="Reset to Sample">
+          <button onClick={handleReset} className="header-btn" title="Reset to Sample Template">
             <RefreshCw size={14} /> Reset
           </button>
-          <button onClick={handlePrint} className="btn-print" title="Print or Save as PDF via system dialog">
-            <Printer size={16} /> Print / Save PDF
+          <label className="header-btn" style={{ cursor: "pointer" }} title="Import Markdown file">
+            <Upload size={14} /> Import
+            <input
+              type="file"
+              accept=".md"
+              onChange={handleImportMarkdown}
+              style={{ display: "none" }}
+            />
+          </label>
+          <button onClick={handleExportMarkdown} className="header-btn" title="Export Markdown file">
+            <Download size={14} /> Export
+          </button>
+          <button onClick={handlePrint} className="btn-print" title="Print or Save as PDF">
+            <Printer size={15} /> Print / Save PDF
           </button>
         </div>
       </header>
@@ -369,22 +423,9 @@ export default function ResumeBuilder() {
                 <Code size={14} /> Custom CSS
               </button>
             </div>
-            {activeTab === "editor" && (
-              <div className="toolbar-group">
-                <label className="toolbar-btn" style={{ cursor: "pointer" }}>
-                  <Upload size={14} style={{ marginRight: 6 }} /> Import
-                  <input
-                    type="file"
-                    accept=".md"
-                    onChange={handleImportMarkdown}
-                    style={{ display: "none" }}
-                  />
-                </label>
-                <button onClick={handleExportMarkdown} className="toolbar-btn">
-                  <Download size={14} /> Export .md
-                </button>
-              </div>
-            )}
+            <div className="toolbar-group" style={{ fontSize: "8pt", color: "var(--text-muted)" }}>
+              <span>{lineCount} lines</span>
+            </div>
           </div>
 
           <div className="editor-wrapper">
@@ -420,38 +461,134 @@ export default function ResumeBuilder() {
 
         {/* Live Preview Panel */}
         <section className="preview-panel">
+          {/* Integrated Control Header in Preview */}
           <div className="preview-header">
             <div className="preview-status">
               <span className="status-dot"></span>
-              <span>Live Preview Synced ({pageCount} {pageCount === 1 ? "Page" : "Pages"})</span>
+              <span>Live Preview ({pageCount} {pageCount === 1 ? "Page" : "Pages"})</span>
             </div>
-            <div className="toolbar-group">
-              <span className="setting-label" style={{ fontSize: "8.5pt" }}>Workspace Zoom:</span>
-              <input
-                type="range"
-                min="0.5"
-                max="1.2"
-                step="0.05"
-                value={zoom}
-                onChange={(e) => setZoom(parseFloat(e.target.value))}
-                className="setting-slider"
-                style={{ width: 80 }}
-              />
-              <span style={{ fontSize: "8.5pt", color: "var(--text-secondary)", width: 35 }}>
-                {Math.round(zoom * 100)}%
-              </span>
+            <div className="control-pill-group">
+              {/* Scale Indicator / Slider Pill */}
+              <div className="control-item">
+                <span className="control-label">Scale:</span>
+                <span style={{ fontWeight: 600, color: "var(--accent-primary)", fontSize: "8.5pt", minWidth: 32 }}>
+                  {Math.round(scale * 100)}%
+                </span>
+              </div>
+              {/* Zoom Controls */}
+              <div className="control-item" style={{ gap: 6 }}>
+                <span className="control-label">Zoom:</span>
+                <input
+                  type="range"
+                  min="0.4"
+                  max="1.2"
+                  step="0.05"
+                  value={zoom}
+                  onChange={(e) => setZoom(parseFloat(e.target.value))}
+                  className="setting-slider"
+                  style={{ width: 65 }}
+                />
+                <span style={{ fontSize: "8pt", color: "var(--text-secondary)", minWidth: 32 }}>
+                  {Math.round(zoom * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={handleResetZoom}
+                  className="toolbar-btn"
+                  style={{ fontSize: "8pt", padding: "2px 6px" }}
+                  title="Fit zoom perfectly to window"
+                >
+                  <Maximize2 size={11} /> Fit
+                </button>
+              </div>
+              {/* Popover Settings Toggle Button */}
               <button
+                ref={popoverButtonRef}
                 type="button"
-                onClick={handleResetZoom}
-                className="toolbar-btn"
-                style={{ fontSize: "8pt", padding: "3px 8px" }}
-                title="Reset zoom to fit view perfectly"
+                onClick={() => setShowSettingsPopover(!showSettingsPopover)}
+                className={`toolbar-btn ${showSettingsPopover ? "active" : ""}`}
+                style={{ padding: "4px 8px" }}
+                title="Open Advanced Page Settings & Tips"
               >
-                Reset to Fit
+                <Sliders size={13} />
               </button>
             </div>
           </div>
-
+          {/* Floating Settings Popover Card */}
+          {showSettingsPopover && (
+            <div ref={popoverRef} className="settings-popover">
+              <div className="popover-header">
+                <span className="popover-title">
+                  <Sliders size={14} style={{ color: "var(--accent-primary)" }} /> Page Settings
+                </span>
+                <button onClick={() => setShowSettingsPopover(false)} className="popover-close">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="setting-group">
+                <label className="setting-label">Document Theme</label>
+                <select
+                  value={theme}
+                  onChange={(e) => {
+                    setTheme(e.target.value);
+                    setCustomCss("");
+                  }}
+                  className="select-pill"
+                  style={{ width: "100%" }}
+                >
+                  {Object.values(THEMES).map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="setting-group">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <label className="setting-label">Auto-fit Content to 1 Page</label>
+                  <label className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      checked={autoScale}
+                      onChange={(e) => setAutoScale(e.target.checked)}
+                    />
+                    <span className="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+              <div className="setting-group">
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <label className="setting-label">Manual Document Scale</label>
+                  <span style={{ fontSize: "8.5pt", fontWeight: 600, color: "var(--accent-primary)" }}>
+                    {Math.round(scale * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.88"
+                  max="1.5"
+                  step="0.01"
+                  value={scale}
+                  disabled={autoScale}
+                  onChange={(e) => setScale(parseFloat(e.target.value))}
+                  className="setting-slider"
+                  style={{ opacity: autoScale ? 0.5 : 1, cursor: autoScale ? "not-allowed" : "pointer" }}
+                />
+                <span style={{ fontSize: "7.5pt", color: "var(--text-muted)" }}>
+                  {autoScale
+                    ? `Auto-fitting active (min scale 88%, ${pageCount} ${pageCount === 1 ? "page" : "pages"}).`
+                    : "Manually enlarge or shrink document font size."}
+                </span>
+              </div>
+              <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: 12, marginTop: 4 }}>
+                <div style={{ display: "flex", gap: 8, color: "var(--text-muted)" }}>
+                  <Info size={14} style={{ flexShrink: 0, marginTop: 2, color: "#60a5fa" }} />
+                  <p style={{ fontSize: "8pt", lineHeight: 1.45 }}>
+                    <strong>PDF Tip:</strong> Click <strong>Print / Save PDF</strong> or press <strong>CMD+P</strong>, select <strong>&quot;Save as PDF&quot;</strong>, and turn on <em>Background graphics</em>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Viewport Canvas for A4 Sheets */}
           <div className="preview-viewport" ref={previewViewportRef}>
             <div
               className="paper-wrapper"
@@ -473,7 +610,7 @@ export default function ResumeBuilder() {
                   border: "none",
                 }}
               >
-                {/* Render pageCount A4 page backgrounds */}
+                {/* Background sheet containers */}
                 <div
                   className="page-backgrounds-container"
                   style={{
@@ -496,7 +633,7 @@ export default function ResumeBuilder() {
                         top: index * pageHeight,
                         left: 0,
                         backgroundColor: "#ffffff",
-                        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.2)",
+                        boxShadow: "0 20px 50px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1)",
                         borderBottom: index < pageCount - 1 ? "2px dashed #94a3b8" : "none",
                         boxSizing: "border-box",
                       }}
@@ -539,84 +676,9 @@ export default function ResumeBuilder() {
             </div>
           </div>
         </section>
-
-        {/* Sidebar Settings Panel */}
-        <aside className="settings-sidebar">
-          <h2 className="sidebar-title">
-            <Sliders size={14} style={{ marginRight: 6, display: "inline" }} />
-            Page Settings
-          </h2>
-
-          <div className="setting-group">
-            <label className="setting-label">Theme</label>
-            <select
-              id="theme-select"
-              value={theme}
-              onChange={(e) => {
-                setTheme(e.target.value);
-                setCustomCss("");
-              }}
-              className="setting-select"
-            >
-              {Object.values(THEMES).map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="setting-group" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <input
-              type="checkbox"
-              id="autoscale-checkbox"
-              checked={autoScale}
-              onChange={(e) => setAutoScale(e.target.checked)}
-              style={{ cursor: "pointer", width: 16, height: 16, accentColor: "var(--accent-primary)" }}
-            />
-            <label htmlFor="autoscale-checkbox" className="setting-label" style={{ cursor: "pointer" }}>
-              Auto-fit to 1 Page
-            </label>
-          </div>
-
-          <div className="setting-group">
-            <div className="slider-container">
-              <div className="slider-header">
-                <span className="setting-label">Document Scale</span>
-                <span className="slider-value">{Math.round(scale * 100)}%</span>
-              </div>
-              <input
-                id="scale-slider"
-                type="range"
-                min=".88"
-                max="1.5"
-                step="0.01"
-                value={scale}
-                disabled={autoScale}
-                onChange={(e) => setScale(parseFloat(e.target.value))}
-                className="setting-slider"
-                style={{ opacity: autoScale ? 0.5 : 1, cursor: autoScale ? "not-allowed" : "pointer" }}
-              />
-              <span style={{ fontSize: "7.5pt", color: "var(--text-muted)", marginTop: 2 }}>
-                {autoScale
-                  ? `Auto-fitting content (min scale 88%, ${pageCount} ${pageCount === 1 ? "page" : "pages"}).`
-                  : "Shrink or enlarge text manually."}
-              </span>
-            </div>
-          </div>
-
-          {/* Margins and Format are hardcoded to standard A4 (margin: 0.4in) */}
-
-          <div style={{ marginTop: "auto", borderTop: "1px solid var(--border-color)", paddingTop: 16 }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "flex-start", color: "var(--text-muted)" }}>
-              <Info size={14} style={{ flexShrink: 0, marginTop: 2 }} />
-              <p style={{ fontSize: "8pt", lineHeight: 1.4 }}>
-                Tips: Use <strong>CMD+P</strong> or click <strong>Print</strong> and select <strong>&quot;Save as PDF&quot;</strong>. Set backgrounds to print. Turn off headers/footers in the print dialog.
-              </p>
-            </div>
-          </div>
-        </aside>
       </main>
 
-      {/* Off-screen Printable & Export Container */}
+      {/* Off-screen Printable Area */}
       <div id="resume-print-area">
         <style dangerouslySetInnerHTML={{ __html: activeThemeCss }} />
         <div
@@ -634,4 +696,3 @@ export default function ResumeBuilder() {
     </div>
   );
 }
-
