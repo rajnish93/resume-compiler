@@ -1,6 +1,19 @@
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { JSDOM } from 'jsdom';
+
+// Configure marked link rendering: anchor links (#) remain in-page, external links open in a new tab
+marked.use({
+  renderer: {
+    link({ href, title, text }) {
+      const cleanHref = href || '';
+      const titleAttr = title ? ` title="${title}"` : '';
+      if (cleanHref.startsWith('#')) {
+        return `<a href="${cleanHref}"${titleAttr}>${text}</a>`;
+      }
+      return `<a href="${cleanHref}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
+    }
+  }
+});
 
 /**
  * Parses Markdown content to HTML and applies resume post-processing
@@ -32,12 +45,14 @@ export function parseMarkdown(markdownText: string): string {
   if (typeof window !== 'undefined') {
     purifier = DOMPurify;
   } else {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { JSDOM } = require('jsdom');
     const windowObj = new JSDOM('').window;
     purifier = DOMPurify(windowObj as unknown as Parameters<typeof DOMPurify>[0]);
   }
 
   return purifier.sanitize(htmlBody, {
-    ADD_ATTR: ['target'],
+    ADD_ATTR: ['target', 'rel'],
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'base', 'head', 'link'],
   });
 }
