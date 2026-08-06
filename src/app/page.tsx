@@ -13,7 +13,7 @@ import {
   Maximize2,
   X
 } from "lucide-react";
-import { parseMarkdown } from "@/lib/parser";
+import { parseMarkdown, sanitizeCss } from "@/lib/parser";
 import { THEMES } from "@/lib/themes";
 
 export default function ResumeBuilder() {
@@ -66,16 +66,25 @@ export default function ResumeBuilder() {
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleKeyDown);
 
-    const iframeDoc = iframeRef.current?.contentDocument;
-    if (iframeDoc) {
-      iframeDoc.addEventListener("mousedown", handleClickOutside);
+    let iframeDoc: Document | null = null;
+    try {
+      iframeDoc = iframeRef.current?.contentDocument || null;
+      if (iframeDoc) {
+        iframeDoc.addEventListener("mousedown", handleClickOutside);
+      }
+    } catch {
+      // Ignore cross-origin access errors
     }
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
-      if (iframeDoc) {
-        iframeDoc.removeEventListener("mousedown", handleClickOutside);
+      try {
+        if (iframeDoc) {
+          iframeDoc.removeEventListener("mousedown", handleClickOutside);
+        }
+      } catch {
+        // Ignore cross-origin access errors
       }
     };
   }, [showSettingsPopover]);
@@ -154,13 +163,21 @@ export default function ResumeBuilder() {
 
   // Pre-render content
   const htmlContent = parseMarkdown(markdown);
-  const activeThemeCss = customCss ? customCss : THEMES[theme]?.css || THEMES["modern"].css;
+  const rawThemeCss = customCss ? customCss : THEMES[theme]?.css || THEMES["modern"].css;
+  const activeThemeCss = sanitizeCss(rawThemeCss);
 
   // In-place iframe synchronization effect (zero flicker, no document re-creation)
   useEffect(() => {
     if (!mounted || !iframeRef.current) return;
     const iframe = iframeRef.current;
-    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    let doc: Document | null = null;
+    try {
+      doc = iframe.contentDocument || iframe.contentWindow?.document || null;
+    } catch {
+      // If navigated cross-origin, reset iframe src back to local about:blank
+      iframe.src = "about:blank";
+      return;
+    }
     if (!doc) return;
 
     // Check if initial iframe structure exists
@@ -174,6 +191,7 @@ export default function ResumeBuilder() {
         <html>
           <head>
             <meta charset="utf-8">
+            <base target="_blank">
             <style id="theme-style"></style>
             <style id="base-style">
               @page {
@@ -243,6 +261,7 @@ export default function ResumeBuilder() {
     // Apply scaling in-place to body
     const bodyEl = doc.body;
     if (bodyEl) {
+      // eslint-disable-next-line react-hooks/immutability
       bodyEl.style.zoom = scale.toString();
     }
 
@@ -292,8 +311,40 @@ export default function ResumeBuilder() {
       }
     };
 
+    // Intercept hyperlink clicks in the preview iframe: anchor links (#) scroll smoothly in preview, external links open in new tab
+    const handleLinkClick = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement | null)?.closest("a");
+      const rawHref = target?.getAttribute("href");
+      if (!rawHref) return;
+
+      if (rawHref.startsWith("#")) {
+        e.preventDefault();
+        const targetId = rawHref.slice(1);
+        if (targetId) {
+          const targetEl = doc.getElementById(targetId) || doc.querySelector(`[name="${targetId}"]`);
+          if (targetEl) {
+            targetEl.scrollIntoView({ behavior: "smooth" });
+          }
+        }
+        return;
+      }
+
+      if (target && target.href) {
+        e.preventDefault();
+        window.open(target.href, "_blank", "noopener,noreferrer");
+      }
+    };
+    doc.addEventListener("click", handleLinkClick);
+
     const timeoutId = setTimeout(runMeasurement, 50);
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(timeoutId);
+      try {
+        doc.removeEventListener("click", handleLinkClick);
+      } catch {
+        // Ignore cross-origin access errors
+      }
+    };
   }, [htmlContent, activeThemeCss, mounted, autoScale, paperFormat, scale, pageCount, pageHeight]);
 
   // Vector Print / Save PDF Handler
