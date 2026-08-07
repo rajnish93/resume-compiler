@@ -407,6 +407,22 @@ export default function ResumeBuilder() {
     }
   };
 
+  // Intercept Cmd+P / Ctrl+P to trigger clean iframe print directly
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        handlePrint();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   // Reset settings by fetching master content directly from data/resume.md
   const handleReset = async () => {
     if (window.confirm("Are you sure you want to reset to the original resume template? Any unsaved edits will be lost.")) {
