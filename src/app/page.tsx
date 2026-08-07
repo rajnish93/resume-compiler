@@ -30,8 +30,8 @@ export default function ResumeBuilder() {
   const [pageCount, setPageCount] = useState<number>(1);
   const [showSettingsPopover, setShowSettingsPopover] = useState<boolean>(false);
 
-  const pageHeight = paperFormat === "a4" ? 1123 : 1056;
-  const pageWidth = paperFormat === "a4" ? 794 : 816;
+  const pageHeight = 1123;
+  const pageWidth = 794;
   const documentHeight = pageCount * pageHeight;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -93,7 +93,7 @@ export default function ResumeBuilder() {
   const handleResetZoom = () => {
     if (previewViewportRef.current) {
       const availableWidth = previewViewportRef.current.clientWidth - 48; // 24px padding left & right
-      const targetPaperWidth = paperFormat === "a4" ? 794 : 816;
+      const targetPaperWidth = 794;
       if (availableWidth > 0) {
         const fitScale = Math.min(1.0, Math.max(0.4, Number((availableWidth / targetPaperWidth).toFixed(2))));
         setZoom(fitScale);
@@ -195,8 +195,11 @@ export default function ResumeBuilder() {
             <style id="theme-style"></style>
             <style id="base-style">
               @page {
-                size: ${paperFormat === "a4" ? "A4" : "letter"};
+                size: a4 portrait;
                 margin: ${margin};
+              }
+              *, *::before, *::after {
+                box-sizing: border-box !important;
               }
               html, body {
                 margin: 0 !important;
@@ -206,19 +209,52 @@ export default function ResumeBuilder() {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
                 width: 100% !important;
+                max-width: 100% !important;
+                overflow-x: hidden !important;
               }
               body {
                 padding: ${margin} !important;
+                word-wrap: break-word !important;
+                overflow-wrap: anywhere !important;
+                word-break: break-word !important;
               }
               .container {
                 width: 100% !important;
+                max-width: 100% !important;
                 padding: 0 !important;
                 margin: 0 !important;
                 box-sizing: border-box !important;
+                word-wrap: break-word !important;
+                overflow-wrap: anywhere !important;
+                word-break: break-word !important;
+              }
+              .container * {
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+              }
+              p, h1, h2, h3, h4, h5, h6, li, a, span, div, td, th {
+                overflow-wrap: anywhere !important;
+                word-wrap: break-word !important;
+                word-break: break-word !important;
+              }
+              pre, code {
+                white-space: pre-wrap !important;
+                word-wrap: break-word !important;
+                overflow-wrap: anywhere !important;
+                word-break: break-word !important;
+              }
+              table {
+                width: 100% !important;
+                max-width: 100% !important;
+                table-layout: fixed !important;
+              }
+              img, svg, canvas, iframe, video {
+                max-width: 100% !important;
+                height: auto !important;
               }
               @media print {
                 @page {
-                  size: ${paperFormat === "a4" ? "A4" : "letter"};
+                  size: a4 portrait;
                   margin: ${margin};
                 }
                 html, body {
