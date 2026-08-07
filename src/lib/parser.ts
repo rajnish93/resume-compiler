@@ -21,7 +21,7 @@ marked.use({
  * Sanitizes output HTML using DOMPurify to prevent XSS attacks across client and SSR.
  */
 export function parseMarkdown(markdownText: string): string {
-  if (!markdownText) return '';
+  if (!markdownText || !markdownText.trim()) return '';
 
   // Parse Markdown to HTML synchronously
   let htmlBody = marked.parse(markdownText, { async: false }) as string;
@@ -45,6 +45,18 @@ export function parseMarkdown(markdownText: string): string {
   if (typeof window !== 'undefined') {
     purifier = DOMPurify;
   } else {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const jsdomPath = (require as any).resolve('jsdom');
+      const webidlPath = jsdomPath.replace(/\/jsdom\/.*/, '/undici/lib/web/webidl/index.js');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { webidl } = (require as any)(webidlPath);
+      if (webidl && webidl.util && typeof webidl.util.markAsUncloneable !== 'function') {
+        webidl.util.markAsUncloneable = () => {};
+      }
+    } catch {
+      // ignore undici resolution errors
+    }
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { JSDOM } = require('jsdom');
     const windowObj = new JSDOM('').window;

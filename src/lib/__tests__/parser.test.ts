@@ -59,6 +59,7 @@ describe('parseMarkdown - XSS Security & HTML Sanitization', () => {
 
   it('should handle empty or whitespace input gracefully', () => {
     assert.equal(parseMarkdown(''), '');
+    assert.equal(parseMarkdown(' \n\t '), '');
   });
 });
 
