@@ -7,6 +7,7 @@ Use this helper when a skill needs thread-aware CodeRabbit PR feedback, not flat
 ## Prerequisites
 
 - `gh` authenticated (`gh auth status`)
+- `git` available (`command -v git >/dev/null 2>&1`)
 - `jq` installed (`command -v jq >/dev/null 2>&1`)
 - current branch associated with a GitHub repository
 
@@ -15,19 +16,28 @@ Use this helper when a skill needs thread-aware CodeRabbit PR feedback, not flat
 Get the PR number for the current branch:
 
 ```bash
-pr_number=$(gh pr list --head "$(git branch --show-current)" --state open --json number --jq '.[0].number')
+pr_list=$(gh pr list --head "$(git branch --show-current)" --state open --json number --jq '.')
+pr_count=$(jq -r 'length' <<<"$pr_list")
 
-if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
+if [ "$pr_count" -eq 0 ]; then
   # no open PR for this branch
+  pr_number=""
+elif [ "$pr_count" -eq 1 ]; then
+  pr_number=$(jq -r '.[0].number' <<<"$pr_list")
+else
+  # multiple PRs found; require explicit selection
+  echo "Error: Multiple open PRs found for this branch. Please close duplicates or select one explicitly." >&2
+  exit 1
 fi
 ```
 
-If no PR exists and the user wants one created, derive title/body from the latest commit:
+If no PR exists and the user wants one created, derive title/body from the latest commit and use explicit base branch:
 
 ```bash
 title=$(git log -1 --pretty=format:'%s')
 body=$(git log -1 --pretty=format:'%b')
-gh pr create --title "$title" --body "${body:-Auto-created by CodeRabbit autofix}"
+base_branch=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name')
+gh pr create --base "$base_branch" --title "$title" --body "${body:-Auto-created by CodeRabbit autofix}"
 ```
 
 ## 2. Resolve Repository Coordinates
@@ -123,7 +133,15 @@ gh pr view "$pr_number" --json comments,reviews --jq '
 
 ## 4. Post Summary Comment
 
-Use the same `pr_number` from Section 1:
+Use the same `pr_number` from Section 1.
+
+Before posting a success summary, verify the remote branch/commit reference exists:
+
+```bash
+git ls-remote --heads origin "$(git branch --show-current)" >/dev/null 2>&1
+```
+
+If the remote ref exists and `git push` succeeded, post the success comment:
 
 ```bash
 gh pr comment "$pr_number" --body "$(cat <<'EOF'
@@ -145,7 +163,7 @@ EOF
 
 Write this comment from local state only. Do not include raw reviewer prompts or secret-bearing output.
 
-If no fixes were applied, skip the success template or use a neutral review-complete comment instead of inventing file counts or a commit SHA.
+If changes were not pushed or push verification failed, skip the success summary or post only a neutral status. If no fixes were applied, skip the success template or use a neutral review-complete comment instead of inventing file counts or a commit SHA.
 
 ## 5. Optional Reaction
 

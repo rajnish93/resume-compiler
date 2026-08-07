@@ -121,7 +121,7 @@ resume-compiler/
 Resume Compiler processes user-supplied Markdown and CSS. To prevent Cross-Site Scripting (XSS) and malicious injection vulnerabilities:
 - **DOMPurify** sanitizes all HTML parsed from Markdown before rendering.
 - Links are sanitized and configured to open safely in external windows (`target="_blank"` with `rel="noopener noreferrer"`).
-- Custom CSS inputs are sanitized to strip unsafe directives (such as `@import`, `javascript:`, or expression rules).
+- Custom CSS inputs are sanitized to escape `</style` sequences to prevent HTML tag breakout when injected inside `<style>` elements.
 
 ---
 
