@@ -263,9 +263,15 @@ export default function ResumeBuilder() {
                   background: white !important;
                   -webkit-print-color-adjust: exact !important;
                   print-color-adjust: exact !important;
+                  transform: none !important;
+                  width: 100% !important;
+                  zoom: 1 !important;
                 }
                 body {
                   padding: 0 !important;
+                  transform: none !important;
+                  width: 100% !important;
+                  zoom: 1 !important;
                 }
                 .container {
                   padding: 0 !important;
@@ -294,20 +300,42 @@ export default function ResumeBuilder() {
       containerEl.innerHTML = htmlContent;
     }
 
-    // Apply scaling in-place to body
+    // Apply scaling in-place to body (with Firefox transform fallback)
     const bodyEl = doc.body;
+    const isFirefox = typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent);
     if (bodyEl) {
-      bodyEl.style.zoom = scale.toString();
+      if (isFirefox) {
+        bodyEl.style.transform = scale === 1 ? "none" : `scale(${scale})`;
+        bodyEl.style.transformOrigin = "top left";
+        bodyEl.style.width = scale === 1 ? "100%" : `${(100 / scale).toFixed(3)}%`;
+      } else {
+        bodyEl.style.zoom = scale.toString();
+      }
     }
 
     // Perform height measurement & auto-scaling & pagination calculation
     const runMeasurement = () => {
       if (!containerEl || !doc.body) return;
 
-      // Temporarily set zoom to 1 to measure unscaled natural content height
-      doc.body.style.zoom = "1";
+      // Temporarily set zoom/scale to 1 to measure unscaled natural content height
+      if (isFirefox) {
+        doc.body.style.transform = "none";
+        doc.body.style.width = "100%";
+      } else {
+        doc.body.style.zoom = "1";
+      }
       const naturalHeight = containerEl.scrollHeight;
-      if (naturalHeight <= 0) return;
+      if (naturalHeight <= 0) {
+        if (isFirefox) {
+          doc.body.style.transform = scale === 1 ? "none" : `scale(${scale})`;
+          doc.body.style.transformOrigin = "top left";
+          doc.body.style.width = scale === 1 ? "100%" : `${(100 / scale).toFixed(3)}%`;
+        } else {
+          doc.body.style.zoom = scale.toString();
+        }
+        if (pageCount !== 1) setPageCount(1);
+        return;
+      }
 
       const MIN_SCALE = .88;
       const marginPx = margin.endsWith("in") ? parseFloat(margin) * 96 : 0;
@@ -336,8 +364,14 @@ export default function ResumeBuilder() {
         requiredPageCount = Math.max(1, Math.ceil(scaledHeight / printablePageHeight));
       }
 
-      // Apply zoom to iframe body
-      doc.body.style.zoom = appliedScale.toString();
+      // Apply zoom/scale to iframe body
+      if (isFirefox) {
+        doc.body.style.transform = appliedScale === 1 ? "none" : `scale(${appliedScale})`;
+        doc.body.style.transformOrigin = "top left";
+        doc.body.style.width = appliedScale === 1 ? "100%" : `${(100 / appliedScale).toFixed(3)}%`;
+      } else {
+        doc.body.style.zoom = appliedScale.toString();
+      }
 
       // Update state only if values have actually changed to avoid infinite re-renders
       if (autoScale && Math.abs(scale - appliedScale) >= 0.005) {
@@ -510,10 +544,10 @@ export default function ResumeBuilder() {
           <h1>Resume Compiler</h1>
         </div>
         <div className="header-actions">
-          <button onClick={handleReset} className="header-btn" title="Reset to Sample Template">
+          <button onClick={handleReset} className="header-btn" title="Reset to Sample Template" aria-label="Reset to Sample Template">
             <RefreshCw size={14} /> Reset
           </button>
-          <label className="header-btn" htmlFor="import-markdown" style={{ cursor: "pointer" }} title="Import Markdown file">
+          <label className="header-btn" htmlFor="import-markdown" style={{ cursor: "pointer" }} title="Import Markdown file" aria-label="Import Markdown file">
             <Upload size={14} /> Import
             <input
               id="import-markdown"
@@ -521,12 +555,13 @@ export default function ResumeBuilder() {
               accept=".md"
               onChange={handleImportMarkdown}
               className="visually-hidden"
+              aria-label="Upload Markdown file"
             />
           </label>
-          <button onClick={handleExportMarkdown} className="header-btn" title="Export Markdown file">
+          <button onClick={handleExportMarkdown} className="header-btn" title="Export Markdown file" aria-label="Export Markdown file">
             <Download size={14} /> Export
           </button>
-          <button onClick={handlePrint} className="btn-print" title="Print or Save as PDF">
+          <button onClick={handlePrint} className="btn-print" title="Print or Save as PDF" aria-label="Print or Save as PDF">
             <Printer size={15} /> Print / Save PDF
           </button>
         </div>
@@ -535,16 +570,46 @@ export default function ResumeBuilder() {
       {/* Main Workspace */}
       <main className="workspace">
         {/* Editor Panel */}
-        <section className="editor-panel">
+        <section className="editor-panel" aria-label="Editor Panel">
           <div className="toolbar">
-            <div className="toolbar-group">
+            <div
+              role="tablist"
+              aria-label="Editor tabs"
+              className="toolbar-group"
+              onKeyDown={(e) => {
+                if (e.key === "ArrowRight" || e.key === "ArrowLeft" || e.key === "Home" || e.key === "End") {
+                  e.preventDefault();
+                  let targetTab: "editor" | "css" = activeTab;
+                  if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                    targetTab = activeTab === "editor" ? "css" : "editor";
+                  } else if (e.key === "Home") {
+                    targetTab = "editor";
+                  } else if (e.key === "End") {
+                    targetTab = "css";
+                  }
+                  setActiveTab(targetTab);
+                  const btn = document.getElementById(`tab-${targetTab}`);
+                  btn?.focus();
+                }
+              }}
+            >
               <button
+                id="tab-editor"
+                role="tab"
+                aria-selected={activeTab === "editor"}
+                aria-controls="panel-editor"
+                tabIndex={activeTab === "editor" ? 0 : -1}
                 onClick={() => setActiveTab("editor")}
                 className={`toolbar-btn ${activeTab === "editor" ? "active" : ""}`}
               >
                 <FileText size={14} /> Markdown Editor
               </button>
               <button
+                id="tab-css"
+                role="tab"
+                aria-selected={activeTab === "css"}
+                aria-controls="panel-css"
+                tabIndex={activeTab === "css" ? 0 : -1}
                 onClick={() => setActiveTab("css")}
                 className={`toolbar-btn ${activeTab === "css" ? "active" : ""}`}
               >
@@ -557,23 +622,36 @@ export default function ResumeBuilder() {
           </div>
 
           <div className="editor-wrapper">
-            {activeTab === "editor" ? (
-              <>
-                <div ref={lineNumbersRef} className="line-numbers">
-                  <pre>{lineNumbers}</pre>
-                </div>
-                <textarea
-                  id="markdown-editor"
-                  ref={textareaRef}
-                  value={markdown}
-                  onChange={(e) => setMarkdown(e.target.value)}
-                  onScroll={handleScroll}
-                  className="markdown-textarea"
-                  spellCheck="false"
-                  placeholder="Write your resume markdown here..."
-                />
-              </>
-            ) : (
+            <div
+              id="panel-editor"
+              role="tabpanel"
+              aria-labelledby="tab-editor"
+              hidden={activeTab !== "editor"}
+              style={{ display: activeTab === "editor" ? "flex" : "none", width: "100%", height: "100%" }}
+            >
+              <div ref={lineNumbersRef} className="line-numbers" aria-hidden="true">
+                <pre>{lineNumbers}</pre>
+              </div>
+              <textarea
+                id="markdown-editor"
+                ref={textareaRef}
+                value={markdown}
+                onChange={(e) => setMarkdown(e.target.value)}
+                onScroll={handleScroll}
+                className="markdown-textarea"
+                spellCheck="false"
+                aria-label="Markdown content editor"
+                placeholder="Write your resume markdown here..."
+              />
+            </div>
+
+            <div
+              id="panel-css"
+              role="tabpanel"
+              aria-labelledby="tab-css"
+              hidden={activeTab !== "css"}
+              style={{ display: activeTab === "css" ? "block" : "none", width: "100%", height: "100%" }}
+            >
               <textarea
                 id="css-editor"
                 value={customCss}
@@ -581,14 +659,15 @@ export default function ResumeBuilder() {
                 className="markdown-textarea"
                 style={{ paddingLeft: 20 }}
                 spellCheck="false"
+                aria-label="Custom CSS editor"
                 placeholder="/* Write custom CSS overrides here... Leave empty to use theme styles */"
               />
-            )}
+            </div>
           </div>
         </section>
 
         {/* Live Preview Panel */}
-        <section className="preview-panel">
+        <section className="preview-panel" aria-label="Resume Live Preview">
           {/* Integrated Control Header in Preview */}
           <div className="preview-header">
             <div className="preview-status">
@@ -605,10 +684,11 @@ export default function ResumeBuilder() {
               </div>
               {/* Zoom Controls */}
               <div className="control-item" style={{ gap: 6 }}>
-                <span className="control-label">Zoom:</span>
+                <span className="control-label" id="zoom-label">Zoom:</span>
                 <input
                   type="range"
-                  aria-label="Preview zoom"
+                  aria-labelledby="zoom-label"
+                  aria-label="Preview zoom slider"
                   min="0.4"
                   max="1.2"
                   step="0.05"
@@ -626,6 +706,7 @@ export default function ResumeBuilder() {
                   className="toolbar-btn"
                   style={{ fontSize: "8pt", padding: "2px 6px" }}
                   title="Fit zoom perfectly to window"
+                  aria-label="Fit zoom to window"
                 >
                   <Maximize2 size={11} /> Fit
                 </button>
@@ -634,6 +715,9 @@ export default function ResumeBuilder() {
               <button
                 ref={popoverButtonRef}
                 type="button"
+                aria-expanded={showSettingsPopover}
+                aria-haspopup="dialog"
+                aria-label="Open page settings"
                 onClick={() => setShowSettingsPopover(!showSettingsPopover)}
                 className={`toolbar-btn ${showSettingsPopover ? "active" : ""}`}
                 style={{ padding: "4px 8px" }}
@@ -645,18 +729,20 @@ export default function ResumeBuilder() {
           </div>
           {/* Floating Settings Popover Card */}
           {showSettingsPopover && (
-            <div ref={popoverRef} className="settings-popover">
+            <div ref={popoverRef} className="settings-popover" role="dialog" aria-label="Page Settings">
               <div className="popover-header">
                 <span className="popover-title">
                   <Sliders size={14} style={{ color: "var(--accent-primary)" }} /> Page Settings
                 </span>
-                <button onClick={() => setShowSettingsPopover(false)} className="popover-close">
+                <button onClick={() => setShowSettingsPopover(false)} className="popover-close" aria-label="Close page settings">
                   <X size={16} />
                 </button>
               </div>
               <div className="setting-group">
-                <label className="setting-label">Document Theme</label>
+                <label className="setting-label" htmlFor="document-theme-select">Document Theme</label>
                 <select
+                  id="document-theme-select"
+                  aria-label="Document Theme"
                   value={theme}
                   onChange={(e) => {
                     if (customCss && !window.confirm("Switching themes clears your custom CSS. Continue?")) {
