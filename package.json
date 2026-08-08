@@ -2,7 +2,7 @@
   "name": "resume-compiler",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@10.32.1",
+  "packageManager": "pnpm@11.20.0",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -30,6 +30,5 @@
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.5",
     "typescript": "^5.9.3"
-  },
-  "packageManager": "pnpm@11.20.0+sha512.9a6f330a95b66446ea088faf1521405a8a01f07fde7124cc9958dfed52d4bb436737e65b08f85f37b46fcba375092558ac51262b816844b22f63406ed166bfee"
+  }
 }
