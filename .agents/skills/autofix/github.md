@@ -31,7 +31,9 @@ else
 fi
 ```
 
-If no PR exists and the user wants one created, derive title/body from the latest commit and use explicit base branch:
+If no PR exists:
+- Ask the user whether to create one.
+- If yes, derive title/body from the latest commit and use explicit base branch:
 
 ```bash
 title=$(git log -1 --pretty=format:'%s')
@@ -39,6 +41,10 @@ body=$(git log -1 --pretty=format:'%b')
 base_branch=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name')
 gh pr create --base "$base_branch" --title "$title" --body "${body:-Auto-created by CodeRabbit autofix}"
 ```
+
+After creating the PR, inform the user to run the skill again in ~5 min and EXIT.
+
+- If no: EXIT immediately before proceeding to any later steps that require `pr_number`.
 
 ## 2. Resolve Repository Coordinates
 
@@ -91,7 +97,7 @@ while :; do
   }')
   status=$?
 
-  if [ $status -ne 0 ] || ! jq -e '.data.repository.pullRequest.reviewThreads' <<<"$response" >/dev/null 2>&1; then
+  if [ $status -ne 0 ] || ! jq -e '.data.repository.pullRequest.reviewThreads' <<<"$response" >/dev/null 2>&1 || [ "$(jq -r '.errors // [] | length' <<<"$response")" != "0" ]; then
     echo "Error: Failed to fetch review threads from GitHub API" >&2
     exit 1
   fi
@@ -117,7 +123,7 @@ Keep each selected thread as one issue unit. Do not collapse top-level PR commen
 To detect CodeRabbit's "Come back again in a few minutes" status message, use top-level PR comments/reviews separately:
 
 ```bash
-gh pr view "$pr_number" --json comments,reviews --jq '
+in_progress_count=$(gh pr view "$pr_number" --json comments,reviews --jq '
   [
     (.comments[]?
       | select(.author.login == "coderabbitai" or .author.login == "coderabbit[bot]" or .author.login == "coderabbitai[bot]")
@@ -128,20 +134,44 @@ gh pr view "$pr_number" --json comments,reviews --jq '
   ]
   | map(select(test("Come back again in a few minutes")))
   | length
-'
+')
+status=$?
+
+if [ $status -ne 0 ]; then
+  echo "Error: Failed to query PR status from GitHub API" >&2
+  exit 1
+fi
 ```
+
+**If exit status is non-zero:** Report that the status is unknown and STOP the autofix flow.
+
+**If exit status is 0 and count is greater than 0:** Inform "⏳ Review in progress, try again in a few minutes" and EXIT.
+
+**If exit status is 0 and count is 0:** No in-progress review found, proceed normally.
 
 ## 4. Post Summary Comment
 
 Use the same `pr_number` from Section 1.
 
-Before posting a success summary, verify the remote branch/commit reference exists:
+Before posting a success summary, verify the remote branch/commit reference exists and is up-to-date:
 
 ```bash
-git ls-remote --heads origin "$(git branch --show-current)" >/dev/null 2>&1
+upstream_ref=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null)
+if [ -z "$upstream_ref" ]; then
+  echo "Warning: No upstream branch configured" >&2
+  remote_verified=false
+else
+  remote_sha=$(git rev-parse "$upstream_ref" 2>/dev/null)
+  local_sha=$(git rev-parse HEAD 2>/dev/null)
+  if [ "$remote_sha" = "$local_sha" ]; then
+    remote_verified=true
+  else
+    remote_verified=false
+  fi
+fi
 ```
 
-If the remote ref exists and `git push` succeeded, post the success comment:
+If the remote ref is verified (`remote_verified=true`) and `git push` succeeded, post the success comment:
 
 ```bash
 gh pr comment "$pr_number" --body "$(cat <<'EOF'

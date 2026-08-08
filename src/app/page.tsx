@@ -410,7 +410,7 @@ export default function ResumeBuilder() {
   // Intercept Cmd+P / Ctrl+P to trigger clean iframe print directly
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.metaKey && event.key.toLowerCase() === "p") {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "p") {
         event.preventDefault();
         handlePrint();
       }
