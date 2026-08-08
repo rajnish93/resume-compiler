@@ -14,8 +14,7 @@ export async function GET() {
       return NextResponse.json({ error: "Template file not found" }, { status: 404 });
     }
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Failed to read template";
     console.error("Failed to read template file:", error);
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: "Failed to read template" }, { status: 500 });
   }
 }

@@ -30,8 +30,8 @@ export default function ResumeBuilder() {
   const [pageCount, setPageCount] = useState<number>(1);
   const [showSettingsPopover, setShowSettingsPopover] = useState<boolean>(false);
 
-  const pageHeight = paperFormat === "a4" ? 1123 : 1056;
-  const pageWidth = paperFormat === "a4" ? 794 : 816;
+  const pageHeight = 1123;
+  const pageWidth = 794;
   const documentHeight = pageCount * pageHeight;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -93,7 +93,7 @@ export default function ResumeBuilder() {
   const handleResetZoom = () => {
     if (previewViewportRef.current) {
       const availableWidth = previewViewportRef.current.clientWidth - 48; // 24px padding left & right
-      const targetPaperWidth = paperFormat === "a4" ? 794 : 816;
+      const targetPaperWidth = 794;
       if (availableWidth > 0) {
         const fitScale = Math.min(1.0, Math.max(0.4, Number((availableWidth / targetPaperWidth).toFixed(2))));
         setZoom(fitScale);
@@ -107,7 +107,7 @@ export default function ResumeBuilder() {
   useEffect(() => {
     const loadInitialData = async () => {
       const savedMarkdown = localStorage.getItem("resume_markdown");
-      if (savedMarkdown) {
+      if (savedMarkdown !== null) {
         setMarkdown(savedMarkdown);
       } else {
         try {
@@ -133,7 +133,7 @@ export default function ResumeBuilder() {
 
   // Persist session edits to localStorage
   useEffect(() => {
-    if (mounted && markdown) {
+    if (mounted) {
       localStorage.setItem("resume_markdown", markdown);
     }
   }, [markdown, mounted]);
@@ -163,8 +163,8 @@ export default function ResumeBuilder() {
 
   // Pre-render content
   const htmlContent = parseMarkdown(markdown);
-  const rawThemeCss = customCss ? customCss : THEMES[theme]?.css || THEMES["modern"].css;
-  const activeThemeCss = sanitizeCss(rawThemeCss);
+  const baseThemeCss = THEMES[theme]?.css || THEMES["modern"].css;
+  const activeThemeCss = `${sanitizeCss(baseThemeCss)}\n${sanitizeCss(customCss)}`;
 
   // In-place iframe synchronization effect (zero flicker, no document re-creation)
   useEffect(() => {
@@ -195,8 +195,11 @@ export default function ResumeBuilder() {
             <style id="theme-style"></style>
             <style id="base-style">
               @page {
-                size: ${paperFormat === "a4" ? "A4" : "letter"};
+                size: a4 portrait;
                 margin: ${margin};
+              }
+              *, *::before, *::after {
+                box-sizing: border-box !important;
               }
               html, body {
                 margin: 0 !important;
@@ -206,19 +209,52 @@ export default function ResumeBuilder() {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
                 width: 100% !important;
+                max-width: 100% !important;
+                overflow-x: hidden !important;
               }
               body {
                 padding: ${margin} !important;
+                word-wrap: break-word !important;
+                overflow-wrap: anywhere !important;
+                word-break: break-word !important;
               }
               .container {
                 width: 100% !important;
+                max-width: 100% !important;
                 padding: 0 !important;
                 margin: 0 !important;
                 box-sizing: border-box !important;
+                word-wrap: break-word !important;
+                overflow-wrap: anywhere !important;
+                word-break: break-word !important;
+              }
+              .container * {
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+              }
+              p, h1, h2, h3, h4, h5, h6, li, a, span, div, td, th {
+                overflow-wrap: anywhere !important;
+                word-wrap: break-word !important;
+                word-break: break-word !important;
+              }
+              pre, code {
+                white-space: pre-wrap !important;
+                word-wrap: break-word !important;
+                overflow-wrap: anywhere !important;
+                word-break: break-word !important;
+              }
+              table {
+                width: 100% !important;
+                max-width: 100% !important;
+                table-layout: fixed !important;
+              }
+              img, svg, canvas, iframe, video {
+                max-width: 100% !important;
+                height: auto !important;
               }
               @media print {
                 @page {
-                  size: ${paperFormat === "a4" ? "A4" : "letter"};
+                  size: a4 portrait;
                   margin: ${margin};
                 }
                 html, body {
@@ -261,7 +297,6 @@ export default function ResumeBuilder() {
     // Apply scaling in-place to body
     const bodyEl = doc.body;
     if (bodyEl) {
-      // eslint-disable-next-line react-hooks/immutability
       bodyEl.style.zoom = scale.toString();
     }
 
@@ -275,28 +310,30 @@ export default function ResumeBuilder() {
       if (naturalHeight <= 0) return;
 
       const MIN_SCALE = .88;
+      const marginPx = margin.endsWith("in") ? parseFloat(margin) * 96 : 0;
+      const printablePageHeight = pageHeight - marginPx * 2;
       let appliedScale = scale;
       let requiredPageCount = 1;
 
       if (autoScale) {
-        if (naturalHeight <= pageHeight) {
+        if (naturalHeight <= printablePageHeight) {
           appliedScale = 1.0;
           requiredPageCount = 1;
         } else {
-          const rawFitScale = pageHeight / naturalHeight;
+          const rawFitScale = printablePageHeight / naturalHeight;
           if (rawFitScale >= MIN_SCALE) {
             appliedScale = Number(rawFitScale.toFixed(2));
             requiredPageCount = 1;
           } else {
             appliedScale = MIN_SCALE;
             const scaledHeight = naturalHeight * appliedScale;
-            requiredPageCount = Math.max(1, Math.ceil(scaledHeight / pageHeight));
+            requiredPageCount = Math.max(1, Math.ceil(scaledHeight / printablePageHeight));
           }
         }
       } else {
         appliedScale = Math.max(MIN_SCALE, scale);
         const scaledHeight = naturalHeight * appliedScale;
-        requiredPageCount = Math.max(1, Math.ceil(scaledHeight / pageHeight));
+        requiredPageCount = Math.max(1, Math.ceil(scaledHeight / printablePageHeight));
       }
 
       // Apply zoom to iframe body
@@ -321,7 +358,14 @@ export default function ResumeBuilder() {
         e.preventDefault();
         const targetId = rawHref.slice(1);
         if (targetId) {
-          const targetEl = doc.getElementById(targetId) || doc.querySelector(`[name="${targetId}"]`);
+          let targetEl: Element | null = doc.getElementById(targetId);
+          if (!targetEl) {
+            try {
+              targetEl = doc.querySelector(`[name="${CSS.escape(targetId)}"]`);
+            } catch {
+              targetEl = null;
+            }
+          }
           if (targetEl) {
             targetEl.scrollIntoView({ behavior: "smooth" });
           }
@@ -363,30 +407,49 @@ export default function ResumeBuilder() {
     }
   };
 
+  // Intercept Cmd+P / Ctrl+P to trigger clean iframe print directly
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        handlePrint();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   // Reset settings by fetching master content directly from data/resume.md
   const handleReset = async () => {
     if (window.confirm("Are you sure you want to reset to the original resume template? Any unsaved edits will be lost.")) {
       try {
         const response = await fetch("/api/template");
-        if (response.ok) {
-          const data = await response.json();
-          if (data.markdown) {
-            setMarkdown(data.markdown);
-          }
+        if (!response.ok) {
+          throw new Error(`Failed to fetch template: ${response.statusText}`);
         }
+        const data = await response.json();
+        if (typeof data.markdown !== "string" || !data.markdown) {
+          throw new Error("Invalid markdown template received from server.");
+        }
+        setMarkdown(data.markdown);
+        localStorage.removeItem("resume_markdown");
+        localStorage.removeItem("resume_custom_css");
+        localStorage.removeItem("resume_theme");
+        localStorage.removeItem("resume_scale");
+        localStorage.removeItem("resume_autoscale");
+        setCustomCss("");
+        setTheme("modern");
+        setScale(0.92);
+        setAutoScale(true);
+        setPageCount(1);
       } catch (err) {
         console.error("Failed to reset template file from data/resume.md:", err);
+        alert("Failed to reset template. Your current changes and settings have been preserved.");
       }
-      localStorage.removeItem("resume_markdown");
-      localStorage.removeItem("resume_custom_css");
-      localStorage.removeItem("resume_theme");
-      localStorage.removeItem("resume_scale");
-      localStorage.removeItem("resume_autoscale");
-      setCustomCss("");
-      setTheme("modern");
-      setScale(0.92);
-      setAutoScale(true);
-      setPageCount(1);
     }
   };
 
@@ -400,18 +463,31 @@ export default function ResumeBuilder() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // Upload markdown file
   const handleImportMarkdown = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 1_000_000) {
+        window.alert("The file is larger than 1 MB. Please choose a smaller markdown file.");
+        input.value = "";
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (event) => {
         const text = event.target?.result;
         if (typeof text === "string") {
           setMarkdown(text);
         }
+        input.value = "";
+      };
+      reader.onerror = () => {
+        console.error("Failed to read the markdown file:", reader.error);
+        window.alert("Could not read the selected file.");
+        input.value = "";
       };
       reader.readAsText(file);
     }
@@ -437,13 +513,14 @@ export default function ResumeBuilder() {
           <button onClick={handleReset} className="header-btn" title="Reset to Sample Template">
             <RefreshCw size={14} /> Reset
           </button>
-          <label className="header-btn" style={{ cursor: "pointer" }} title="Import Markdown file">
+          <label className="header-btn" htmlFor="import-markdown" style={{ cursor: "pointer" }} title="Import Markdown file">
             <Upload size={14} /> Import
             <input
+              id="import-markdown"
               type="file"
               accept=".md"
               onChange={handleImportMarkdown}
-              style={{ display: "none" }}
+              className="visually-hidden"
             />
           </label>
           <button onClick={handleExportMarkdown} className="header-btn" title="Export Markdown file">
@@ -531,6 +608,7 @@ export default function ResumeBuilder() {
                 <span className="control-label">Zoom:</span>
                 <input
                   type="range"
+                  aria-label="Preview zoom"
                   min="0.4"
                   max="1.2"
                   step="0.05"
@@ -581,6 +659,9 @@ export default function ResumeBuilder() {
                 <select
                   value={theme}
                   onChange={(e) => {
+                    if (customCss && !window.confirm("Switching themes clears your custom CSS. Continue?")) {
+                      return;
+                    }
                     setTheme(e.target.value);
                     setCustomCss("");
                   }}
@@ -594,9 +675,10 @@ export default function ResumeBuilder() {
               </div>
               <div className="setting-group">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <label className="setting-label">Auto-fit Content to 1 Page</label>
+                  <label htmlFor="autofit-toggle" className="setting-label">Auto-fit Content to 1 Page</label>
                   <label className="toggle-switch">
                     <input
+                      id="autofit-toggle"
                       type="checkbox"
                       checked={autoScale}
                       onChange={(e) => setAutoScale(e.target.checked)}
@@ -607,12 +689,13 @@ export default function ResumeBuilder() {
               </div>
               <div className="setting-group">
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <label className="setting-label">Manual Document Scale</label>
+                  <label className="setting-label" htmlFor="manual-scale">Manual Document Scale</label>
                   <span style={{ fontSize: "8.5pt", fontWeight: 600, color: "var(--accent-primary)" }}>
                     {Math.round(scale * 100)}%
                   </span>
                 </div>
                 <input
+                  id="manual-scale"
                   type="range"
                   min="0.88"
                   max="1.5"
@@ -730,7 +813,7 @@ export default function ResumeBuilder() {
       </main>
 
       {/* Off-screen Printable Area */}
-      <div id="resume-print-area">
+      <div id="resume-print-area" className={`format-${paperFormat}`}>
         <style dangerouslySetInnerHTML={{ __html: activeThemeCss }} />
         <div
           className="container"

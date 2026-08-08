@@ -35,14 +35,9 @@ Senior Full-Stack Software Engineer with 8+ years of experience designing, archi
 - Developed comprehensive automated testing suites utilizing **Jest, React Testing Library, and Playwright**, elevating backend unit test coverage to **92%**.
 - Refactored legacy monolithic API controllers into modular serverless functions on **AWS Lambda**, reducing server overhead costs by **25%**.
 
-### Software Engineer
-**CloudScale Systems** | *June 2020 - December 2022* | *Austin, TX*
+### Frontend Engineer
+**Bright Labs** | *July 2018 - May 2020* | *Portland, OR*
 
-- Architected and deployed scalable workflow automation modules powered by **Node.js, TypeScript, GraphQL, and RabbitMQ**.
-- Implemented **Terraform** modules to manage cloud infrastructure on **AWS (ECS, S3, RDS)**, achieving zero-downtime blue/green deployments.
-- Designed secure multi-tenant authentication and authorization infrastructure using **OAuth2, OpenID Connect, and granular RBAC**.
-- Developed comprehensive automated testing suites utilizing **Jest, React Testing Library, and Playwright**, elevating backend unit test coverage to **92%**.
-- Refactored legacy monolithic API controllers into modular serverless functions on **AWS Lambda**, reducing server overhead costs by **25%**.
 - Built dynamic, responsive web interfaces using **React, Redux Toolkit, and RESTful APIs** for client enterprise portals.
 - Integrated third-party payment gateways, automated invoicing, and subscription billing management using **Stripe API**.
 - Partnered closely with UI/UX designers to establish an accessibility-compliant custom design system used across 4 internal products.
