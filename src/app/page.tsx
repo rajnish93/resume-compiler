@@ -1,20 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import {
-  FileText,
-  Printer,
-  RefreshCw,
-  Sliders,
-  Download,
-  Upload,
-  Info,
-  Code,
-  Maximize2,
-  X
-} from "lucide-react";
 import { parseMarkdown, sanitizeCss } from "@/lib/parser";
 import { THEMES } from "@/lib/themes";
+import { Header } from "@/components/Header";
+import { EditorPanel } from "@/components/EditorPanel";
+import { PreviewHeader } from "@/components/PreviewHeader";
+import { SettingsPopover } from "@/components/SettingsPopover";
 
 export default function ResumeBuilder() {
   const [markdown, setMarkdown] = useState<string>("");
@@ -504,223 +496,56 @@ export default function ResumeBuilder() {
   return (
     <div className="app-container">
       {/* App Header */}
-      <header className="app-header">
-        <div className="logo">
-          <div className="logo-icon">R</div>
-          <h1>Resume Compiler</h1>
-        </div>
-        <div className="header-actions">
-          <button onClick={handleReset} className="header-btn" title="Reset to Sample Template">
-            <RefreshCw size={14} /> Reset
-          </button>
-          <label className="header-btn" htmlFor="import-markdown" style={{ cursor: "pointer" }} title="Import Markdown file">
-            <Upload size={14} /> Import
-            <input
-              id="import-markdown"
-              type="file"
-              accept=".md"
-              onChange={handleImportMarkdown}
-              className="visually-hidden"
-            />
-          </label>
-          <button onClick={handleExportMarkdown} className="header-btn" title="Export Markdown file">
-            <Download size={14} /> Export
-          </button>
-          <button onClick={handlePrint} className="btn-print" title="Print or Save as PDF">
-            <Printer size={15} /> Print / Save PDF
-          </button>
-        </div>
-      </header>
+      <Header
+        onReset={handleReset}
+        onImport={handleImportMarkdown}
+        onExport={handleExportMarkdown}
+        onPrint={handlePrint}
+      />
 
       {/* Main Workspace */}
       <main className="workspace">
         {/* Editor Panel */}
-        <section className="editor-panel">
-          <div className="toolbar">
-            <div className="toolbar-group">
-              <button
-                onClick={() => setActiveTab("editor")}
-                className={`toolbar-btn ${activeTab === "editor" ? "active" : ""}`}
-              >
-                <FileText size={14} /> Markdown Editor
-              </button>
-              <button
-                onClick={() => setActiveTab("css")}
-                className={`toolbar-btn ${activeTab === "css" ? "active" : ""}`}
-              >
-                <Code size={14} /> Custom CSS
-              </button>
-            </div>
-            <div className="toolbar-group" style={{ fontSize: "8pt", color: "var(--text-muted)" }}>
-              <span>{lineCount} lines</span>
-            </div>
-          </div>
-
-          <div className="editor-wrapper">
-            {activeTab === "editor" ? (
-              <>
-                <div ref={lineNumbersRef} className="line-numbers">
-                  <pre>{lineNumbers}</pre>
-                </div>
-                <textarea
-                  id="markdown-editor"
-                  ref={textareaRef}
-                  value={markdown}
-                  onChange={(e) => setMarkdown(e.target.value)}
-                  onScroll={handleScroll}
-                  className="markdown-textarea"
-                  spellCheck="false"
-                  placeholder="Write your resume markdown here..."
-                />
-              </>
-            ) : (
-              <textarea
-                id="css-editor"
-                value={customCss}
-                onChange={(e) => setCustomCss(e.target.value)}
-                className="markdown-textarea"
-                style={{ paddingLeft: 20 }}
-                spellCheck="false"
-                placeholder="/* Write custom CSS overrides here... Leave empty to use theme styles */"
-              />
-            )}
-          </div>
-        </section>
+        <EditorPanel
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          markdown={markdown}
+          setMarkdown={setMarkdown}
+          customCss={customCss}
+          setCustomCss={setCustomCss}
+          lineCount={lineCount}
+          lineNumbers={lineNumbers}
+          textareaRef={textareaRef}
+          lineNumbersRef={lineNumbersRef}
+          onScroll={handleScroll}
+        />
 
         {/* Live Preview Panel */}
         <section className="preview-panel">
-          {/* Integrated Control Header in Preview */}
-          <div className="preview-header">
-            <div className="preview-status">
-              <span className="status-dot"></span>
-              <span>Live Preview ({pageCount} {pageCount === 1 ? "Page" : "Pages"})</span>
-            </div>
-            <div className="control-pill-group">
-              {/* Scale Indicator / Slider Pill */}
-              <div className="control-item">
-                <span className="control-label">Scale:</span>
-                <span style={{ fontWeight: 600, color: "var(--accent-primary)", fontSize: "8.5pt", minWidth: 32 }}>
-                  {Math.round(scale * 100)}%
-                </span>
-              </div>
-              {/* Zoom Controls */}
-              <div className="control-item" style={{ gap: 6 }}>
-                <span className="control-label">Zoom:</span>
-                <input
-                  type="range"
-                  aria-label="Preview zoom"
-                  min="0.4"
-                  max="1.2"
-                  step="0.05"
-                  value={zoom}
-                  onChange={(e) => setZoom(parseFloat(e.target.value))}
-                  className="setting-slider"
-                  style={{ width: 65 }}
-                />
-                <span style={{ fontSize: "8pt", color: "var(--text-secondary)", minWidth: 32 }}>
-                  {Math.round(zoom * 100)}%
-                </span>
-                <button
-                  type="button"
-                  onClick={handleResetZoom}
-                  className="toolbar-btn"
-                  style={{ fontSize: "8pt", padding: "2px 6px" }}
-                  title="Fit zoom perfectly to window"
-                >
-                  <Maximize2 size={11} /> Fit
-                </button>
-              </div>
-              {/* Popover Settings Toggle Button */}
-              <button
-                ref={popoverButtonRef}
-                type="button"
-                onClick={() => setShowSettingsPopover(!showSettingsPopover)}
-                className={`toolbar-btn ${showSettingsPopover ? "active" : ""}`}
-                style={{ padding: "4px 8px" }}
-                title="Open Advanced Page Settings & Tips"
-              >
-                <Sliders size={13} />
-              </button>
-            </div>
-          </div>
-          {/* Floating Settings Popover Card */}
+          <PreviewHeader
+            pageCount={pageCount}
+            scale={scale}
+            zoom={zoom}
+            setZoom={setZoom}
+            onResetZoom={handleResetZoom}
+            showSettingsPopover={showSettingsPopover}
+            setShowSettingsPopover={setShowSettingsPopover}
+            popoverButtonRef={popoverButtonRef}
+          />
           {showSettingsPopover && (
-            <div ref={popoverRef} className="settings-popover">
-              <div className="popover-header">
-                <span className="popover-title">
-                  <Sliders size={14} style={{ color: "var(--accent-primary)" }} /> Page Settings
-                </span>
-                <button onClick={() => setShowSettingsPopover(false)} className="popover-close">
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="setting-group">
-                <label className="setting-label">Document Theme</label>
-                <select
-                  value={theme}
-                  onChange={(e) => {
-                    if (customCss && !window.confirm("Switching themes clears your custom CSS. Continue?")) {
-                      return;
-                    }
-                    setTheme(e.target.value);
-                    setCustomCss("");
-                  }}
-                  className="select-pill"
-                  style={{ width: "100%" }}
-                >
-                  {Object.values(THEMES).map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="setting-group">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <label htmlFor="autofit-toggle" className="setting-label">Auto-fit Content to 1 Page</label>
-                  <label className="toggle-switch">
-                    <input
-                      id="autofit-toggle"
-                      type="checkbox"
-                      checked={autoScale}
-                      onChange={(e) => setAutoScale(e.target.checked)}
-                    />
-                    <span className="toggle-slider"></span>
-                  </label>
-                </div>
-              </div>
-              <div className="setting-group">
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <label className="setting-label" htmlFor="manual-scale">Manual Document Scale</label>
-                  <span style={{ fontSize: "8.5pt", fontWeight: 600, color: "var(--accent-primary)" }}>
-                    {Math.round(scale * 100)}%
-                  </span>
-                </div>
-                <input
-                  id="manual-scale"
-                  type="range"
-                  min="0.88"
-                  max="1.5"
-                  step="0.01"
-                  value={scale}
-                  disabled={autoScale}
-                  onChange={(e) => setScale(parseFloat(e.target.value))}
-                  className="setting-slider"
-                  style={{ opacity: autoScale ? 0.5 : 1, cursor: autoScale ? "not-allowed" : "pointer" }}
-                />
-                <span style={{ fontSize: "7.5pt", color: "var(--text-muted)" }}>
-                  {autoScale
-                    ? `Auto-fitting active (min scale 88%, ${pageCount} ${pageCount === 1 ? "page" : "pages"}).`
-                    : "Manually enlarge or shrink document font size."}
-                </span>
-              </div>
-              <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: 12, marginTop: 4 }}>
-                <div style={{ display: "flex", gap: 8, color: "var(--text-muted)" }}>
-                  <Info size={14} style={{ flexShrink: 0, marginTop: 2, color: "#60a5fa" }} />
-                  <p style={{ fontSize: "8pt", lineHeight: 1.45 }}>
-                    <strong>PDF Tip:</strong> Click <strong>Print / Save PDF</strong> or press <strong>CMD+P</strong>, select <strong>&quot;Save as PDF&quot;</strong>, and turn on <em>Background graphics</em>.
-                  </p>
-                </div>
-              </div>
-            </div>
+            <SettingsPopover
+              theme={theme}
+              setTheme={setTheme}
+              customCss={customCss}
+              setCustomCss={setCustomCss}
+              autoScale={autoScale}
+              setAutoScale={setAutoScale}
+              scale={scale}
+              setScale={setScale}
+              pageCount={pageCount}
+              onClose={() => setShowSettingsPopover(false)}
+              popoverRef={popoverRef}
+            />
           )}
           {/* Viewport Canvas for A4 Sheets */}
           <div className="preview-viewport" ref={previewViewportRef}>
