@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { parseMarkdown, sanitizeCss } from "@/lib/parser";
 import { THEMES } from "@/lib/themes";
+import { safeStorage } from "@/lib/storage";
 
 export default function ResumeBuilder() {
   const [markdown, setMarkdown] = useState<string>("");
@@ -103,10 +104,10 @@ export default function ResumeBuilder() {
     setZoom(0.75);
   };
 
-  // Initialize state on mount: check localStorage or fetch data/resume.md from /api/template
+  // Initialize state on mount: check safeStorage or fetch data/resume.md from /api/template
   useEffect(() => {
     const loadInitialData = async () => {
-      const savedMarkdown = localStorage.getItem("resume_markdown");
+      const savedMarkdown = safeStorage.getItem("resume_markdown");
       if (savedMarkdown !== null) {
         setMarkdown(savedMarkdown);
       } else {
@@ -121,37 +122,37 @@ export default function ResumeBuilder() {
         }
       }
 
-      setCustomCss(localStorage.getItem("resume_custom_css") || "");
-      setTheme(localStorage.getItem("resume_theme") || "modern");
-      setScale(Number(localStorage.getItem("resume_scale")) || 0.92);
-      setAutoScale(localStorage.getItem("resume_autoscale") !== "false");
+      setCustomCss(safeStorage.getItem("resume_custom_css") || "");
+      setTheme(safeStorage.getItem("resume_theme") || "modern");
+      setScale(Number(safeStorage.getItem("resume_scale")) || 0.92);
+      setAutoScale(safeStorage.getItem("resume_autoscale") !== "false");
       setMounted(true);
     };
 
     loadInitialData();
   }, []);
 
-  // Persist session edits to localStorage
+  // Persist session edits to safeStorage
   useEffect(() => {
     if (mounted) {
-      localStorage.setItem("resume_markdown", markdown);
+      safeStorage.setItem("resume_markdown", markdown);
     }
   }, [markdown, mounted]);
 
   useEffect(() => {
-    if (mounted) localStorage.setItem("resume_custom_css", customCss);
+    if (mounted) safeStorage.setItem("resume_custom_css", customCss);
   }, [customCss, mounted]);
 
   useEffect(() => {
-    if (mounted) localStorage.setItem("resume_theme", theme);
+    if (mounted) safeStorage.setItem("resume_theme", theme);
   }, [theme, mounted]);
 
   useEffect(() => {
-    if (mounted) localStorage.setItem("resume_scale", scale.toString());
+    if (mounted) safeStorage.setItem("resume_scale", scale.toString());
   }, [scale, mounted]);
 
   useEffect(() => {
-    if (mounted) localStorage.setItem("resume_autoscale", autoScale.toString());
+    if (mounted) safeStorage.setItem("resume_autoscale", autoScale.toString());
   }, [autoScale, mounted]);
 
   // Handle scroll syncing
@@ -436,11 +437,11 @@ export default function ResumeBuilder() {
           throw new Error("Invalid markdown template received from server.");
         }
         setMarkdown(data.markdown);
-        localStorage.removeItem("resume_markdown");
-        localStorage.removeItem("resume_custom_css");
-        localStorage.removeItem("resume_theme");
-        localStorage.removeItem("resume_scale");
-        localStorage.removeItem("resume_autoscale");
+        safeStorage.removeItem("resume_markdown");
+        safeStorage.removeItem("resume_custom_css");
+        safeStorage.removeItem("resume_theme");
+        safeStorage.removeItem("resume_scale");
+        safeStorage.removeItem("resume_autoscale");
         setCustomCss("");
         setTheme("modern");
         setScale(0.92);
