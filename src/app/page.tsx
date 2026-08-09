@@ -15,14 +15,22 @@ import {
 } from "lucide-react";
 import { parseMarkdown, sanitizeCss } from "@/lib/parser";
 import { THEMES } from "@/lib/themes";
-import { safeStorage } from "@/lib/storage";
+import { useResumeStore } from "@/lib/store";
 
 export default function ResumeBuilder() {
-  const [markdown, setMarkdown] = useState<string>("");
-  const [customCss, setCustomCss] = useState<string>("");
-  const [theme, setTheme] = useState<string>("modern");
-  const [scale, setScale] = useState<number>(0.92);
-  const [autoScale, setAutoScale] = useState<boolean>(true);
+  const {
+    markdown,
+    customCss,
+    theme,
+    scale,
+    autoScale,
+    setMarkdown,
+    setCustomCss,
+    setTheme,
+    setScale,
+    setAutoScale,
+    resetStore,
+  } = useResumeStore();
   const margin = "0.4in";
   const paperFormat = "a4";
   const [activeTab, setActiveTab] = useState<"editor" | "css">("editor");
@@ -104,13 +112,10 @@ export default function ResumeBuilder() {
     setZoom(0.75);
   };
 
-  // Initialize state on mount: check safeStorage or fetch data/resume.md from /api/template
+  // Initialize state on mount: load template from /api/template if markdown is empty
   useEffect(() => {
     const loadInitialData = async () => {
-      const savedMarkdown = safeStorage.getItem("resume_markdown");
-      if (savedMarkdown !== null) {
-        setMarkdown(savedMarkdown);
-      } else {
+      if (!useResumeStore.getState().markdown) {
         try {
           const res = await fetch("/api/template");
           if (res.ok) {
@@ -121,39 +126,11 @@ export default function ResumeBuilder() {
           console.error("Failed to load template from data/resume.md:", err);
         }
       }
-
-      setCustomCss(safeStorage.getItem("resume_custom_css") || "");
-      setTheme(safeStorage.getItem("resume_theme") || "modern");
-      setScale(Number(safeStorage.getItem("resume_scale")) || 0.92);
-      setAutoScale(safeStorage.getItem("resume_autoscale") !== "false");
       setMounted(true);
     };
 
     loadInitialData();
-  }, []);
-
-  // Persist session edits to safeStorage
-  useEffect(() => {
-    if (mounted) {
-      safeStorage.setItem("resume_markdown", markdown);
-    }
-  }, [markdown, mounted]);
-
-  useEffect(() => {
-    if (mounted) safeStorage.setItem("resume_custom_css", customCss);
-  }, [customCss, mounted]);
-
-  useEffect(() => {
-    if (mounted) safeStorage.setItem("resume_theme", theme);
-  }, [theme, mounted]);
-
-  useEffect(() => {
-    if (mounted) safeStorage.setItem("resume_scale", scale.toString());
-  }, [scale, mounted]);
-
-  useEffect(() => {
-    if (mounted) safeStorage.setItem("resume_autoscale", autoScale.toString());
-  }, [autoScale, mounted]);
+  }, [setMarkdown]);
 
   // Handle scroll syncing
   const handleScroll = () => {
@@ -436,16 +413,7 @@ export default function ResumeBuilder() {
         if (typeof data.markdown !== "string" || !data.markdown) {
           throw new Error("Invalid markdown template received from server.");
         }
-        setMarkdown(data.markdown);
-        safeStorage.removeItem("resume_markdown");
-        safeStorage.removeItem("resume_custom_css");
-        safeStorage.removeItem("resume_theme");
-        safeStorage.removeItem("resume_scale");
-        safeStorage.removeItem("resume_autoscale");
-        setCustomCss("");
-        setTheme("modern");
-        setScale(0.92);
-        setAutoScale(true);
+        resetStore(data.markdown);
         setPageCount(1);
       } catch (err) {
         console.error("Failed to reset template file from data/resume.md:", err);
