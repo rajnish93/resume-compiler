@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { DEFAULT_RESUME_MARKDOWN } from "@/lib/defaultResumeTemplate";
 
 export async function GET() {
   try {
@@ -9,12 +10,10 @@ export async function GET() {
     if (fs.existsSync(filePath)) {
       const fileContent = fs.readFileSync(filePath, "utf8");
       return NextResponse.json({ markdown: fileContent });
-    } else {
-      console.warn(`Template file not found at: ${filePath}`);
-      return NextResponse.json({ error: "Template file not found" }, { status: 404 });
     }
   } catch (error: unknown) {
-    console.error("Failed to read template file:", error);
-    return NextResponse.json({ error: "Failed to read template" }, { status: 500 });
+    console.warn("Failed to read template file from disk, using bundled fallback:", error);
   }
+
+  return NextResponse.json({ markdown: DEFAULT_RESUME_MARKDOWN });
 }
