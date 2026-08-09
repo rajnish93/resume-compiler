@@ -13,7 +13,7 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://resume-compiler.vercel.app"),
+  metadataBase: new URL("https://resume.rajnish.app/"),
   title: "Resume Compiler - Interactive Markdown Resume Builder",
   description:
     "An interactive real-time Markdown resume builder and compiler. Choose beautiful themes, customize margins, adjust document scale, and download print-ready PDFs.",
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     title: "Resume Compiler - Interactive Markdown Resume Builder",
     description:
       "An interactive real-time Markdown resume builder and compiler. Choose beautiful themes, customize margins, adjust document scale, and download print-ready PDFs.",
-    url: "https://resume-compiler.vercel.app",
+    url: "https://resume.rajnish.app/",
     siteName: "Resume Compiler",
     locale: "en_US",
     type: "website",
