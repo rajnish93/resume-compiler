@@ -24,17 +24,18 @@ export default function ResumeBuilder() {
     theme,
     scale,
     autoScale,
+    zoom,
     setMarkdown,
     setCustomCss,
     setTheme,
     setScale,
     setAutoScale,
+    setZoom,
     resetStore,
   } = useResumeStore();
   const margin = "0.4in";
   const paperFormat = "a4";
   const [activeTab, setActiveTab] = useState<"editor" | "css">("editor");
-  const [zoom, setZoom] = useState<number>(0.75);
   const [mounted, setMounted] = useState<boolean>(false);
   const [pageCount, setPageCount] = useState<number>(1);
   const [showSettingsPopover, setShowSettingsPopover] = useState<boolean>(false);

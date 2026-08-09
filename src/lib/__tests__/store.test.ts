@@ -9,6 +9,7 @@ test("useResumeStore - initial state and state mutations", () => {
   assert.equal(typeof state.theme, "string");
   assert.equal(typeof state.scale, "number");
   assert.equal(typeof state.autoScale, "boolean");
+  assert.equal(typeof state.zoom, "number");
 
   // Test setMarkdown
   state.setMarkdown("# Test Resume");
@@ -30,6 +31,10 @@ test("useResumeStore - initial state and state mutations", () => {
   state.setAutoScale(false);
   assert.equal(useResumeStore.getState().autoScale, false);
 
+  // Test setZoom
+  state.setZoom(0.9);
+  assert.equal(useResumeStore.getState().zoom, 0.9);
+
   // Test resetStore
   state.resetStore("# Default Markdown");
   const resetState = useResumeStore.getState();
@@ -38,4 +43,5 @@ test("useResumeStore - initial state and state mutations", () => {
   assert.equal(resetState.theme, "modern");
   assert.equal(resetState.scale, 0.92);
   assert.equal(resetState.autoScale, true);
+  assert.equal(resetState.zoom, 0.75);
 });
