@@ -13,8 +13,35 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://resume.rajnish.app/"),
   title: "Resume Compiler - Interactive Markdown Resume Builder",
-  description: "An interactive real-time Markdown resume builder and compiler. Choose beautiful themes, customize margins, adjust document scale, and download print-ready PDFs.",
+  description:
+    "An interactive real-time Markdown resume builder and compiler. Choose beautiful themes, customize margins, adjust document scale, and download print-ready PDFs.",
+  keywords: [
+    "resume builder",
+    "markdown resume",
+    "resume compiler",
+    "pdf generator",
+    "cv builder",
+  ],
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Resume Compiler - Interactive Markdown Resume Builder",
+    description:
+      "An interactive real-time Markdown resume builder and compiler. Choose beautiful themes, customize margins, adjust document scale, and download print-ready PDFs.",
+    url: "https://resume.rajnish.app/",
+    siteName: "Resume Compiler",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Resume Compiler - Interactive Markdown Resume Builder",
+    description:
+      "An interactive real-time Markdown resume builder and compiler. Choose beautiful themes, customize margins, adjust document scale, and download print-ready PDFs.",
+  },
 };
 
 export default function RootLayout({
